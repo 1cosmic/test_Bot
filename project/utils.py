@@ -9,6 +9,7 @@ class States(Helper):
     mode = HelperMode.snake_case
 
     REGISTER = ListItem()
+    AWAIT = ListItem()
     AWAIT_QUEST = ListItem()
     GO_TO_NEXT = ListItem()
     GOODBYE = ListItem()

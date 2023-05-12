@@ -1,4 +1,7 @@
+import dis
 import random
+import re
+from string import ascii_letters
 
 from new_upload_videos import config
 
@@ -6,7 +9,7 @@ from project.users import User
 from project.buttons import Buttons
 from project.utils import States, States_Quest, code_Morze
 from project.video_notes import Video_Notes
-from project.skeleton_quest import create_quests, free_quests
+from project.skeleton_quest import create_quests, free_quests, user_in_quests
 from project.messages import quests_welcomes, quests_answers, quests_dops, quests_hints, welcome_start
 
 from aiogram import Bot, Dispatcher, executor, types
@@ -19,6 +22,7 @@ from asyncio import sleep
 # =-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-=
 # Функции для внутренней работы программы (автоматизаторы).
 
+filter_char_name = "абвгдеёжзийклмнопрстуфхцчшщъыьэюя"
 # =-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-=
 # =-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-=
 
@@ -54,7 +58,7 @@ if __name__ == "__main__":
         pre_register_user.remove(id)
 
         state = dispatcher.current_state(user=id)
-        await state.set_state(States.REGISTER[0])
+        await state.set_state(States.AWAIT[0])
 
         list_user[id] = User(id, username, None, state)
 
@@ -62,6 +66,8 @@ if __name__ == "__main__":
         await sleep(5)
 
         await tg_bot.send_message(id, welcome_start['reg_ask_name'], reply_markup=types.ReplyKeyboardRemove())
+
+        await state.set_state(States.REGISTER[0])
 
 
     # Создаём список квестов для прохождения.
@@ -77,7 +83,8 @@ if __name__ == "__main__":
                 id = quest.id
 
                 if id in user.required_quests():
-                    await tg_bot.send_message(user.chatId, "Перенаправляю на следующий квест...")
+                    await tg_bot.send_message(user.chatId, "Перенаправляю на следующий квест...",
+                                              reply_markup=types.ReplyKeyboardRemove())
 
                     # Удаляем пользователя из очереди ожидающих.
                     await_user.remove(u)
@@ -114,7 +121,8 @@ if __name__ == "__main__":
                     await state.set_state(States_Quest.all()[q.id])
 
                     # Уведомляем пользователя об переходе на следующий квест.
-                    await tg_bot.send_message(user.chatId, f"Перенаправляю на следующий квест: {q.name}")
+                    await tg_bot.send_message(user.chatId, f"Перенаправляю на следующий квест: {q.name}",
+                                              reply_markup=types.ReplyKeyboardRemove())
                     await welcome_to_the_Quest(user, q.id)
 
                     # DEBUG:
@@ -203,7 +211,7 @@ if __name__ == "__main__":
             await tg_bot.send_video_note(user.chatId, video)
             await sleep(5)
 
-        await tg_bot.send_message(user.chatId, quests_welcomes[id_quest], reply_markup = types.ReplyKeyboardRemove())
+        await tg_bot.send_message(user.chatId, quests_welcomes[id_quest], reply_markup=types.ReplyKeyboardRemove())
 
 
     async def quest_processor(id, msg, id_quest):
@@ -215,7 +223,7 @@ if __name__ == "__main__":
         if msg.text == quests_answers[id_quest]:
 
             videos_true = videos.dops["answer_true"]
-            random_video = random.randint(0, len(videos_true) -1)
+            random_video = random.randint(0, len(videos_true) - 1)
 
             await tg_bot.send_video_note(id, videos_true[random_video])
             await sleep(1.5)
@@ -227,27 +235,25 @@ if __name__ == "__main__":
 
         else:
 
+            if user.get_counter() >= 2:
+                user.reset_counter()
+
             flag_for_hints = user.get_counter()
-            if flag_for_hints < 2:
 
-                user.up_counter()
+            user.up_counter()
 
-                videos_false = videos.dops["answer_false"]
-                random_video = random.randint(0, len(videos_false) -1)
+            videos_false = videos.dops["answer_false"]
+            random_video = random.randint(0, len(videos_false) - 1)
 
-                await tg_bot.send_video_note(id, videos_false[random_video])
-                await sleep(1.5)
-                await msg.answer(quests_dops["False"])
-                await sleep(1)
+            await tg_bot.send_video_note(id, videos_false[random_video])
+            await sleep(1.5)
+            await msg.answer(quests_dops["False"])
+            await sleep(1)
 
-                await tg_bot.send_video_note(id, videos.hint[id_quest][flag_for_hints])
-                await sleep(1.5)
-                await msg.reply(quests_hints[id_quest][flag_for_hints])
-                await sleep(1)
-
-            else:
-                print("Дописать логику: при превышении числа подсказок.")
-                return False
+            await tg_bot.send_video_note(id, videos.hint[id_quest][flag_for_hints])
+            await sleep(1.5)
+            await msg.reply(quests_hints[id_quest][flag_for_hints])
+            await sleep(1)
 
 
     # =-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-=
@@ -285,6 +291,36 @@ if __name__ == "__main__":
 
         # Чистим историю диалога, если человек вышел за границы наших возможностей и познал Дзен.
         # await tg_bot.delete_message(message.chat.id, message.message_id)
+
+
+    @dispatcher.message_handler(state="*", commands=["restart"])
+    async def restart_game_for_user(msg: types.Message):
+        """
+        Сбрасывает все состояния пользовател, переводя его в режим регистрации.
+        :param msg:
+        :return:
+        """
+
+        id = msg.from_user.id
+
+        if user_in_quests(list_quest, id):
+            user = list_user[id]
+            quest_id = user.get_cur_quest().id
+
+            list_quest[quest_id].free()
+            await go_to_next_quest(quest_id)
+
+        if id in list_user.keys():
+            await list_user[id].state.reset_state()
+            list_user.pop(id)
+
+        if id in pre_register_user:
+            pre_register_user.remove(id)
+
+
+    @dispatcher.message_handler(state=States.AWAIT)
+    async def wait(msg: types.Message):
+        pass
 
 
     @dispatcher.callback_query_handler(lambda c: c.data == "!reg")
@@ -382,7 +418,7 @@ if __name__ == "__main__":
                     t += coded[i]
 
             videos_false = videos.dops["answer_false"]
-            random_video = random.randint(0, len(videos_false) -1)
+            random_video = random.randint(0, len(videos_false) - 1)
             await tg_bot.send_video_note(id, videos_false[random_video])
             await sleep(1.5)
 
@@ -392,14 +428,12 @@ if __name__ == "__main__":
 
         else:
             videos_true = videos.dops["answer_true"]
-            random_video = random.randint(0, len(videos_true) -1)
+            random_video = random.randint(0, len(videos_true) - 1)
             await tg_bot.send_video_note(id, videos_true[random_video])
             await sleep(1.5)
 
             await msg.answer(text="Молодец! Все верно!\nКвест пройден!")
             await quit_from_quest(user=user)
-
-
 
 
     @dispatcher.message_handler(state=States_Quest.all()[1::])
@@ -428,17 +462,21 @@ if __name__ == "__main__":
 
         if msg.text == "Да" and list_user[id].name != None:
 
+            await state.set_state(States.AWAIT[0])
             await msg.answer("Отлично! Мы готовы начинать.", reply_markup=types.ReplyKeyboardRemove())
 
             await tg_bot.send_video_note(id, Video_Notes().dops["hello_go"])
             await sleep(10)
 
+
             await msg.answer("Ну что, начнём приключения?", reply_markup=Buttons["k_run"]),
             await msg.answer("Как только ты будешь готов, нажми кнопку и мы приступим!",
                              reply_markup=Buttons["b_run"])
 
-            # Включить после написания готовой логики распределения по квестам.
+
             await state.set_state(States.GO_TO_NEXT[0])  # распределение по алгоритму.
+
+            # Включить после написания готовой логики распределения по квестам.
             # await state.set_state(States.AWAIT_QUEST[0])  # распределение по кнопке.
 
         elif msg.text == "Нет":
@@ -446,7 +484,22 @@ if __name__ == "__main__":
             list_user[id].name = None
 
         else:
-            list_user[id].name = msg.text
+
+            filter_name = re.sub(r'[^\w\s]+|[\d]+', '', msg.text).strip()
+
+            for c in filter_name.lower():
+                if c not in filter_char_name:
+                    list_user[id].name = None
+                    await msg.reply("В твоём имени должны быть только буквы кириллицы. Попробуй ещё раз!")
+                    return
+
+            if len(filter_name) <= 1:
+                await msg.reply("Я понимаю только буквы кириллицы.")
+                list_user[id].name = None
+
+                return
+
+            list_user[id].name = filter_name
 
             await tg_bot.send_message(id, "Убедись, что твоё имя написано правильно.")
             await sleep(1.5)
@@ -470,6 +523,7 @@ if __name__ == "__main__":
             return await register(id, msg.from_user.username)
 
         await msg.reply("Для начала работы введи команду: /start")
+        # await msg.reply(ascii_letters)
         # await msg.reply(f"Your ID: {id}")
 
 

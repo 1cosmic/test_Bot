@@ -54,6 +54,14 @@ class Quest():
             return False
 
 
+    def get_user(self):
+        if self.__occupy_by_user != None:
+            return self.__occupy_by_user
+
+        else:
+            return None
+
+
 def create_quests():
     """
     Создаём список квестов (для фильтрации по приоритетности).
@@ -86,3 +94,13 @@ def free_quests(quests_list):
 
     print("Вывожу результат фильтрации:", print_res)
     return res
+
+
+def user_in_quests(quests_list, user_id):
+    res = list(filter(lambda x: x.get_user(), quests_list))
+
+    if user_id in res:
+        return True
+
+    else:
+        return False
