@@ -1,7 +1,7 @@
 from aiogram import  types
 
 button_text = {
-    "go_to_game": "Начинаем!",
+    "go_to_game": "Начинаем! ▶️",
 
     "name_yes": "Да!",
     "name_no": "Нет, повторить",

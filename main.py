@@ -1,16 +1,14 @@
-import dis
-import random
+from random import shuffle, randint
 import re
-from string import ascii_letters
 
-from new_upload_videos import config
+from project import config
 
 from project.users import User
-from project.buttons import Buttons
+from project.buttons import Buttons, button_text
 from project.utils import States, States_Quest, code_Morze
 from project.video_notes import Video_Notes
 from project.skeleton_quest import create_quests, free_quests, user_in_quests
-from project.messages import quests_welcomes, quests_answers, quests_dops, quests_hints, welcome_start
+from project.messages import quests_welcomes, quests_answers, quests_dops, quests_hints, welcome_start, reg_start
 
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
@@ -62,10 +60,12 @@ if __name__ == "__main__":
 
         list_user[id] = User(id, username, None, state)
 
-        await tg_bot.send_video_note(id, videos.dops["hello_start"])
+        await tg_bot.send_video_note(id, videos.dops["hello_start"], reply_markup=types.ReplyKeyboardRemove())
         await sleep(5)
 
-        await tg_bot.send_message(id, welcome_start['reg_ask_name'], reply_markup=types.ReplyKeyboardRemove())
+        await tg_bot.send_message(id, welcome_start["reg"])
+        await sleep(1)
+        await tg_bot.send_message(id, welcome_start['reg_ask_name'])
 
         await state.set_state(States.REGISTER[0])
 
@@ -93,37 +93,47 @@ if __name__ == "__main__":
                     list_quest[id].occupy(user)
                     user.set_cur_quest(quest)
 
-                    # Устанавливаем состояние пользователя на прохождение соответствующего квеста.
                     # cur_state = dispatcher.current_state(user=u)
                     # await cur_state.set_state(States_Quest.all()[id])
-                    await user.state.set_state(States_Quest.all()[id])
 
                     # DEBUG:
                     # await tg_bot.send_message(user.chatId, f"Твоё текущее состояние: {await user.state.get_state()}")
+
+                    await user.state.set_state(States.AWAIT[0])
                     await welcome_to_the_Quest(user, quest.id)
+
+                    # Устанавливаем состояние пользователя на прохождение соответствующего квеста.
+                    await user.state.set_state(States_Quest.all()[id])
 
         if quest == None:
 
-            print("Пытаюсь обработать пользователя.")
+            # print("Пытаюсь обработать пользователя.")
 
-            for q in free_quests(list_quest):
+            quests = free_quests(list_quest)
+            shuffle(quests)
+
+            for q in quests:
 
                 if q.id in user.required_quests():
-                    print("Сейчас пользователь будет перенаправлен.")
+                    # print("Сейчас пользователь будет перенаправлен.")
 
                     # Связываем пользователя и его квест.
                     # quest_id = list_quest.index(q)
                     list_quest[q.id].occupy(user)
                     user.set_cur_quest(q)
 
+                    await tg_bot.send_message(user.chatId, f"Перенаправляю на следующее задание: {q.name}",
+                                              reply_markup=types.ReplyKeyboardRemove())
+
                     # Устанавливаем состояние пользователя на прохождение соответствующего квеста.
-                    state = dispatcher.current_state(user=user.chatId)
+                    await user.state.set_state(States.AWAIT[0])
+
+                    await welcome_to_the_Quest(user, q.id)
+
+                    state = user.state
                     await state.set_state(States_Quest.all()[q.id])
 
                     # Уведомляем пользователя об переходе на следующий квест.
-                    await tg_bot.send_message(user.chatId, f"Перенаправляю на следующий квест: {q.name}",
-                                              reply_markup=types.ReplyKeyboardRemove())
-                    await welcome_to_the_Quest(user, q.id)
 
                     # DEBUG:
                     # await tg_bot.send_message(user.chatId, f"Твоё текущее состояние: {await state.get_state()}")
@@ -197,7 +207,7 @@ if __name__ == "__main__":
 
         # Перенаправляем юзера, освободившего квест.
         await tg_bot.send_message(user.chatId,
-                                  "Сейчас я отправлю тебя на следующий квест.",
+                                  "Сейчас я отправлю тебя на следующее задание.",
                                   reply_markup=Buttons['k_run'])
         await tg_bot.send_message(user.chatId, "Готов?", reply_markup=Buttons['b_run'])
 
@@ -206,8 +216,9 @@ if __name__ == "__main__":
 
         await sleep(1)
 
+
         for video in videos.question[id_quest]:
-            print(video)
+            # print(video)
             await tg_bot.send_video_note(user.chatId, video)
             await sleep(5)
 
@@ -218,12 +229,12 @@ if __name__ == "__main__":
 
         user = list_user[id]
 
-        print(f"Попытка пользователя № {user.get_counter()}")
+        # print(f"Попытка пользователя № {user.get_counter()}")
 
-        if msg.text == quests_answers[id_quest]:
+        if msg.text.lower() == quests_answers[id_quest]:
 
             videos_true = videos.dops["answer_true"]
-            random_video = random.randint(0, len(videos_true) - 1)
+            random_video = randint(0, len(videos_true) - 1)
 
             await tg_bot.send_video_note(id, videos_true[random_video])
             await sleep(1.5)
@@ -240,10 +251,8 @@ if __name__ == "__main__":
 
             flag_for_hints = user.get_counter()
 
-            user.up_counter()
-
             videos_false = videos.dops["answer_false"]
-            random_video = random.randint(0, len(videos_false) - 1)
+            random_video = randint(0, len(videos_false) - 1)
 
             await tg_bot.send_video_note(id, videos_false[random_video])
             await sleep(1.5)
@@ -254,6 +263,8 @@ if __name__ == "__main__":
             await sleep(1.5)
             await msg.reply(quests_hints[id_quest][flag_for_hints])
             await sleep(1)
+
+            user.up_counter()
 
 
     # =-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-=
@@ -282,7 +293,7 @@ if __name__ == "__main__":
 
             await message.answer(welcome_start['hello'], reply_markup=Buttons['k_start'])
             # await sleep(1)
-            await tg_bot.send_message(id, "Тебя ждёт увлекательное приключение!", reply_markup=Buttons['b_start'])
+            await tg_bot.send_message(id, welcome_start['hello_2'], reply_markup=Buttons['b_start'])
 
             return True
 
@@ -335,15 +346,18 @@ if __name__ == "__main__":
         id = callback_query.from_user.id
         username = callback_query.from_user.username
 
-        if id in pre_register_user:
+        if id in pre_register_user and id not in list_user.keys():
             await register(id, username)
 
 
     @dispatcher.callback_query_handler(lambda c: c.data == "!run", state=States.GO_TO_NEXT)
     async def processed_message(msg: types.Message):
 
-        await msg.answer("Кнопка обработана.")
+        await msg.answer("Смотрю, свободен ли путь...")
+
         user = msg.from_user.id
+        await list_user[user].state.set_state(States.AWAIT[0])
+
         await check_of_free_quests(user)
 
 
@@ -418,7 +432,7 @@ if __name__ == "__main__":
                     t += coded[i]
 
             videos_false = videos.dops["answer_false"]
-            random_video = random.randint(0, len(videos_false) - 1)
+            random_video = randint(0, len(videos_false) - 1)
             await tg_bot.send_video_note(id, videos_false[random_video])
             await sleep(1.5)
 
@@ -428,7 +442,7 @@ if __name__ == "__main__":
 
         else:
             videos_true = videos.dops["answer_true"]
-            random_video = random.randint(0, len(videos_true) - 1)
+            random_video = randint(0, len(videos_true) - 1)
             await tg_bot.send_video_note(id, videos_true[random_video])
             await sleep(1.5)
 
@@ -460,17 +474,18 @@ if __name__ == "__main__":
         id = msg.from_user.id
         state = list_user[id].state
 
-        if msg.text == "Да" and list_user[id].name != None:
+        if msg.text == button_text['reg_yes'] and list_user[id].name != None:
 
             await state.set_state(States.AWAIT[0])
-            await msg.answer("Отлично! Мы готовы начинать.", reply_markup=types.ReplyKeyboardRemove())
 
-            await tg_bot.send_video_note(id, Video_Notes().dops["hello_go"])
-            await sleep(10)
+            await tg_bot.send_video_note(id, Video_Notes().dops["hello_go"], reply_markup=types.ReplyKeyboardRemove())
+            await sleep(5)
 
+            await msg.answer(welcome_start['start_game'], reply_markup=Buttons["k_run"])
+            await sleep(1)
 
-            await msg.answer("Ну что, начнём приключения?", reply_markup=Buttons["k_run"]),
-            await msg.answer("Как только ты будешь готов, нажми кнопку и мы приступим!",
+            # await msg.answer(reg_start['go?'], reply_markup=Buttons["k_run"]),
+            await msg.answer(reg_start['start?'],
                              reply_markup=Buttons["b_run"])
 
 
@@ -479,7 +494,7 @@ if __name__ == "__main__":
             # Включить после написания готовой логики распределения по квестам.
             # await state.set_state(States.AWAIT_QUEST[0])  # распределение по кнопке.
 
-        elif msg.text == "Нет":
+        elif msg.text == button_text['reg_no']:
             await msg.answer(welcome_start['reg_ask_name'])
             list_user[id].name = None
 
@@ -522,7 +537,7 @@ if __name__ == "__main__":
         if msg.from_user.id in pre_register_user:
             return await register(id, msg.from_user.username)
 
-        await msg.reply("Для начала работы введи команду: /start")
+        await msg.reply("Для начала работы введи команду: /start", reply_markup=types.ReplyKeyboardRemove())
         # await msg.reply(ascii_letters)
         # await msg.reply(f"Your ID: {id}")
 
