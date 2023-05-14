@@ -1,5 +1,5 @@
 
-count_quest = 9
+count_quest = 10
 count_hints = 2
 
 
@@ -13,18 +13,31 @@ class User:
         self.__required_quests = list(range(count_quest))  # список квестов для прохождения
         self.__current_quest = None
         self.__counter_of_attemps = 0
+        self.__counter_of_help = 0
 
 
-    def get_counter(self):
+    def get_counter_attemps(self):
         return self.__counter_of_attemps
 
 
-    def reset_counter(self):
+    def reset_counter_attemps(self):
         self.__counter_of_attemps = 0
 
 
-    def up_counter(self):
+    def up_counter_attemps(self):
         self.__counter_of_attemps += 1
+
+
+    def get_counter_help(self):
+        return self.__counter_of_help
+
+
+    def reset_counter_help(self):
+        self.__counter_of_help = 0
+
+
+    def up_counter_help(self):
+        self.__counter_of_help += 1
 
 
     def set_cur_quest(self, quest):

@@ -21,6 +21,8 @@ from asyncio import sleep
 # Функции для внутренней работы программы (автоматизаторы).
 
 filter_char_name = "абвгдеёжзийклмнопрстуфхцчшщъыьэюя"
+counter_help = 3
+
 # =-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-=
 # =-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-=
 
@@ -109,8 +111,10 @@ if __name__ == "__main__":
 
             # print("Пытаюсь обработать пользователя.")
 
-            quests = free_quests(list_quest)
-            shuffle(quests)
+            quests = free_quests(list_quest)[::-1]
+
+            # Мешаем содержимое списка, рандомизируя порядок квестов.
+            # shuffle(quests)
 
             for q in quests:
 
@@ -131,6 +135,7 @@ if __name__ == "__main__":
                     await welcome_to_the_Quest(user, q.id)
 
                     state = user.state
+                    print(q.id)
                     await state.set_state(States_Quest.all()[q.id])
 
                     # Уведомляем пользователя об переходе на следующий квест.
@@ -147,7 +152,7 @@ if __name__ == "__main__":
         """
         Функция распределения пользователей по комнатам-квестам.
 
-        :param message:
+        # :param message:
         :return:
         """
 
@@ -189,6 +194,7 @@ if __name__ == "__main__":
     async def quit_from_quest(user):
 
         state = user.state
+        await state.set_state(States.AWAIT[0])
 
         # Освобождаем квест.
         quest = user.get_cur_quest()
@@ -197,13 +203,14 @@ if __name__ == "__main__":
         # Очищаем данный квест из непрошедних пользоватем и устанавливаем текущий - None.
         user.pop_quest(quest.id)
         user.set_cur_quest(None)
-        user.reset_counter()
-
-        # await msg.answer(f"Твоё текущее состояние: {await state.get_state()}")
-        await state.set_state(States.GO_TO_NEXT[0])
+        user.reset_counter_attemps()
+        user.reset_counter_help()
 
         # Отправляем освободившийся квест дальше по очереди.
         await go_to_next_quest(quest=quest)
+
+        # await msg.answer(f"Твоё текущее состояние: {await state.get_state()}")
+        await state.set_state(States.GO_TO_NEXT[0])
 
         # Перенаправляем юзера, освободившего квест.
         await tg_bot.send_message(user.chatId,
@@ -220,16 +227,17 @@ if __name__ == "__main__":
         for video in videos.question[id_quest]:
             # print(video)
             await tg_bot.send_video_note(user.chatId, video)
-            await sleep(5)
+            await sleep(8)
 
-        await tg_bot.send_message(user.chatId, quests_welcomes[id_quest], reply_markup=types.ReplyKeyboardRemove())
+        await tg_bot.send_message(user.chatId, quests_welcomes[id_quest].format(user.name),
+                                  reply_markup=types.ReplyKeyboardRemove())
 
 
     async def quest_processor(id, msg, id_quest):
 
         user = list_user[id]
 
-        # print(f"Попытка пользователя № {user.get_counter()}")
+        # print(f"Попытка пользователя № {user.get_counter_attemps()}")
 
         if msg.text.lower() == quests_answers[id_quest]:
 
@@ -245,11 +253,11 @@ if __name__ == "__main__":
             return True
 
         else:
+            # Отправляем нужную подсказку в соответствии с числом попыток.
+            if user.get_counter_attemps() >= 2:
+                user.reset_counter_attemps()
 
-            if user.get_counter() >= 2:
-                user.reset_counter()
-
-            flag_for_hints = user.get_counter()
+            flag_for_hints = user.get_counter_attemps()
 
             videos_false = videos.dops["answer_false"]
             random_video = randint(0, len(videos_false) - 1)
@@ -259,12 +267,27 @@ if __name__ == "__main__":
             await msg.answer(quests_dops["False"])
             await sleep(1)
 
-            await tg_bot.send_video_note(id, videos.hint[id_quest][flag_for_hints])
-            await sleep(1.5)
-            await msg.reply(quests_hints[id_quest][flag_for_hints])
-            await sleep(1)
+            if id_quest in videos.hint.keys():
+                if flag_for_hints < len(videos.hint[id_quest]):
 
-            user.up_counter()
+                    await tg_bot.send_video_note(id, videos.hint[id_quest][flag_for_hints])
+                    await sleep(1.5)
+
+            if id_quest in quests_hints.keys():
+                await msg.reply(quests_hints[id_quest][flag_for_hints])
+                await sleep(1)
+
+            user.up_counter_attemps()
+
+            # Проверяем, нужна ли ему помощь пропустить квест.
+            if user.get_counter_help() >= counter_help:
+
+                await tg_bot.send_message(id, "Задание слишком сложное? Нажми кнопку \"Пропустить\".",
+                                          reply_markup=Buttons["skip_quest"])
+
+            else:
+                user.up_counter_help()
+
 
 
     # =-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-=
@@ -361,12 +384,30 @@ if __name__ == "__main__":
         await check_of_free_quests(user)
 
 
+    @dispatcher.callback_query_handler(lambda x: x.data == "!skip_quest", state=States_Quest.all())
+    async def quit_from_game(msg: types.Message):
+        """
+        Выход из игры.
+        """
+
+        user_id = msg.from_user.id
+        user = list_user[user_id]
+        quest_id = user.get_cur_quest().id
+
+        answer = quests_answers[quest_id]
+        await tg_bot.send_message(user_id,
+                                  f"Не печалься! В следующий раз обязательно получится 😉. Правильный ответ: {answer}")
+
+        await quit_from_quest(user)
+
+        return True
+
+
     @dispatcher.message_handler(state=States_Quest.all(), commands=['quit'])
     async def quit_from_game(msg: types.Message):
         """
         Выход из игры.
 
-        :param message:
         :return:
         """
 
@@ -388,11 +429,12 @@ if __name__ == "__main__":
     @dispatcher.message_handler(state=States.GO_TO_NEXT)
     async def processed_message(msg: types.Message):
 
-        user = msg.from_user.id
-        # state = dispatcher.current_state(user = user)
-        # await msg.answer(f"Твоё текущее состояние в хэндлере GO_TO_NEXT: {await state.get_state()}")
+        id = msg.from_user.id
+        user = list_user[id]
 
-        await check_of_free_quests(user)
+        await user.state.set_state(States.AWAIT[0])
+
+        await check_of_free_quests(id)
 
 
     ##
@@ -450,7 +492,7 @@ if __name__ == "__main__":
             await quit_from_quest(user=user)
 
 
-    @dispatcher.message_handler(state=States_Quest.all()[1::])
+    @dispatcher.message_handler(state=States_Quest.all()[1:8:])
     async def q_Quiz(msg: types.Message):
 
         id = msg.from_user.id
@@ -460,6 +502,21 @@ if __name__ == "__main__":
         if await quest_processor(id, msg, quest.id):
             # await msg.reply(quests_dops["True"])
             await quit_from_quest(user)
+
+
+    @dispatcher.message_handler(state=States_Quest.QUEST_9, content_types=types.ContentType.ANY)
+    async def q_Photo(msg: types.ContentType.ANY):
+
+        user_id = msg.from_user.id
+        user = list_user[user_id]
+
+        if msg.PHOTO is not None:
+            print("Сдано!")
+
+        else:
+            msg.reply("Я хочу увидеть фотографию твоего рисунка.")
+
+
 
 
     @dispatcher.message_handler(state=States.REGISTER)

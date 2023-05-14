@@ -29,6 +29,7 @@ class States_Quest(Helper):
     QUEST_7 = ListItem()
     QUEST_8 = ListItem()
     QUEST_9 = ListItem()
+    QUEST_10 = ListItem()
 
 
 code_Morze = {'а': '.-', 'б': '-...', 'в': '.--', 'г': '--.', 'д': '-..', 'е': '.', 'ё': '.',

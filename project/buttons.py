@@ -8,6 +8,8 @@ button_text = {
 
     "reg_yes": "Да",
     "reg_no": "Нет",
+
+    "skip_quest": "Пропустить 🆘"
 }
 # Комплект кнопок для ответа пользователя
 buttons_of_regs = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True).row(
@@ -37,6 +39,8 @@ key_of_run.add(
     types.KeyboardButton(text=button_text["go_to_game"], callback_data="!run"))
 
 
+button_of_skip = types.InlineKeyboardMarkup(resize_keyboard=True)
+button_of_skip.add(types.KeyboardButton(text=button_text["skip_quest"], callback_data="!skip_quest"))
 
 
 # Словарь всех кнопок.
@@ -48,4 +52,6 @@ Buttons = {
 
     "b_run": button_of_run,
     "k_run": key_of_run,
+
+    "skip_quest": button_of_skip,
 }
