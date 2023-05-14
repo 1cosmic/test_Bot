@@ -1,3 +1,5 @@
+import random
+
 from aiogram import  types
 
 button_text = {
@@ -55,3 +57,38 @@ Buttons = {
 
     "skip_quest": button_of_skip,
 }
+
+
+# Кнопки ответов.
+
+class Answers_buttons():
+
+    def __init__(self, list_answers):
+        self.keyboard = None
+        self.buttons = [
+            types.KeyboardButton(list_answers[0]),
+            types.KeyboardButton(list_answers[1]),
+            types.KeyboardButton(list_answers[2]),
+            types.KeyboardButton(list_answers[3]),
+        ]
+
+        # for answer in list_answers:
+        #     self.buttons.append(types.KeyboardButton(answer))
+
+        self.keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2).row(self.buttons[0],
+                                                                                         self.buttons[1],
+                                                                                         self.buttons[2],
+                                                                                         self.buttons[3])
+
+    def restruct(self):
+        # self.__answers = list_answers
+
+        random.shuffle(self.buttons)
+
+        return self.keyboard
+
+
+
+answ = [1, 2, 3, 4]
+
+Buttons_answers = Answers_buttons(answ)

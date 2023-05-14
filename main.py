@@ -4,7 +4,7 @@ import re
 from project import config
 
 from project.users import User
-from project.buttons import Buttons, button_text
+from project.buttons import Buttons, button_text, Buttons_answers
 from project.utils import States, States_Quest, code_Morze
 from project.video_notes import Video_Notes
 from project.skeleton_quest import create_quests, free_quests, user_in_quests
@@ -114,7 +114,7 @@ if __name__ == "__main__":
             quests = free_quests(list_quest)[::-1]
 
             # Мешаем содержимое списка, рандомизируя порядок квестов.
-            # shuffle(quests)
+            shuffle(quests)
 
             for q in quests:
 
@@ -135,7 +135,7 @@ if __name__ == "__main__":
                     await welcome_to_the_Quest(user, q.id)
 
                     state = user.state
-                    print(q.id)
+                    # print(q.id)
                     await state.set_state(States_Quest.all()[q.id])
 
                     # Уведомляем пользователя об переходе на следующий квест.
@@ -232,10 +232,16 @@ if __name__ == "__main__":
         await tg_bot.send_message(user.chatId, quests_welcomes[id_quest].format(user.name),
                                   reply_markup=types.ReplyKeyboardRemove())
 
+        if id_quest in range(6, 9):
+            await sleep(1)
+            await tg_bot.send_message(user.chatId, "Выбери правильный ответ.", reply_markup=Buttons_answers.restruct())
+
+
 
     async def quest_processor(id, msg, id_quest):
 
         user = list_user[id]
+        # msg.reply("Test: ", reply_markup=Buttons_answers.keyboard)
 
         # print(f"Попытка пользователя № {user.get_counter_attemps()}")
 
@@ -249,7 +255,7 @@ if __name__ == "__main__":
 
             await msg.answer(quests_dops["True"])
             await sleep(1)
-
+            #
             return True
 
         else:
@@ -279,6 +285,12 @@ if __name__ == "__main__":
 
             user.up_counter_attemps()
 
+            # # Если квест с 6 по 8 - даём выбор правильных ответов.
+            # if id_quest in range(6, 9):
+            #
+            #     await msg.answer("Выбери правильный ответ.", reply_markup=Buttons_answers.restruct())
+            #     # print(range(6, 9))
+
             # Проверяем, нужна ли ему помощь пропустить квест.
             if user.get_counter_help() >= counter_help:
 
@@ -288,6 +300,8 @@ if __name__ == "__main__":
             else:
                 user.up_counter_help()
 
+        # id_quest = user.get_cur_quest().id
+        # await user.state.set_state(States_Quest.all()[id_quest])
 
 
     # =-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-=
@@ -436,7 +450,6 @@ if __name__ == "__main__":
 
         await check_of_free_quests(id)
 
-
     ##
     ####
     ##### =================================
@@ -450,6 +463,8 @@ if __name__ == "__main__":
         user = list_user[id]
         name = user.name
         coded = ''
+
+        await user.state.set_state(States.AWAIT[0])
 
         for char in name.lower():
             coded += code_Morze[char]
@@ -480,7 +495,6 @@ if __name__ == "__main__":
 
             await msg.answer(text=f"Нет, что-то здесь не так. Попробуй еще раз. Звездочками обозначены "
                                   f"места с ошибками.\n {t}")
-            return
 
         else:
             videos_true = videos.dops["answer_true"]
@@ -491,31 +505,43 @@ if __name__ == "__main__":
             await msg.answer(text="Молодец! Все верно!\nКвест пройден!")
             await quit_from_quest(user=user)
 
+            return
 
-    @dispatcher.message_handler(state=States_Quest.all()[1:8:])
+        await user.state.set_state(States_Quest.QUEST_1[0])
+
+
+    @dispatcher.message_handler(state=States_Quest.all()[1:9:])
     async def q_Quiz(msg: types.Message):
 
         id = msg.from_user.id
         user = list_user[id]
         quest = user.get_cur_quest()
 
+        await user.state.set_state(States.AWAIT[0])
+
         if await quest_processor(id, msg, quest.id):
             # await msg.reply(quests_dops["True"])
             await quit_from_quest(user)
 
+        else:
+            await user.state.set_state(States_Quest.all()[quest.id])
+
 
     @dispatcher.message_handler(state=States_Quest.QUEST_9, content_types=types.ContentType.ANY)
-    async def q_Photo(msg: types.ContentType.ANY):
+    async def q_Photo(msg: types.Message):
 
-        user_id = msg.from_user.id
-        user = list_user[user_id]
+        id = msg.from_user.id
+        user = list_user[id]
+        quest = user.get_cur_quest()
 
-        if msg.PHOTO is not None:
-            print("Сдано!")
+        if len(msg.photo) > 0:
+            await msg.reply("Да у тебя талант!")
+            await quit_from_quest(user)
 
-        else:
-            msg.reply("Я хочу увидеть фотографию твоего рисунка.")
+            return
 
+        # else:
+        await msg.reply("Я хочу увидеть фотографию твоего рисунка.")
 
 
 
