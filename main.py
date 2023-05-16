@@ -85,7 +85,7 @@ if __name__ == "__main__":
                 id = quest.id
 
                 if id in user.required_quests():
-                    await tg_bot.send_message(user.chatId, "Перенаправляю на следующий квест...",
+                    await tg_bot.send_message(user.chatId, "Перенаправляю на следующее задание...",
                                               reply_markup=types.ReplyKeyboardRemove())
 
                     # Удаляем пользователя из очереди ожидающих.
@@ -111,7 +111,7 @@ if __name__ == "__main__":
 
             # print("Пытаюсь обработать пользователя.")
 
-            quests = free_quests(list_quest)[::-1]
+            quests = free_quests(list_quest)
 
             # Мешаем содержимое списка, рандомизируя порядок квестов.
             shuffle(quests)
@@ -126,8 +126,8 @@ if __name__ == "__main__":
                     list_quest[q.id].occupy(user)
                     user.set_cur_quest(q)
 
-                    await tg_bot.send_message(user.chatId, f"Перенаправляю на следующее задание: {q.name}",
-                                              reply_markup=types.ReplyKeyboardRemove())
+                    # await tg_bot.send_message(user.chatId, f"Перенаправляю на следующее задание: {q.name}",
+                    #                           reply_markup=types.ReplyKeyboardRemove())
 
                     # Устанавливаем состояние пользователя на прохождение соответствующего квеста.
                     await user.state.set_state(States.AWAIT[0])
@@ -175,7 +175,7 @@ if __name__ == "__main__":
                         await_user.append(id)
 
                     await tg_bot.send_message(id,
-                                              "Погоди немного, сейчас освободится локация и я тебя проведу к ней. Держи телефон при себе!")
+                                              "Погоди немного, сейчас освободится задание и я тебя проведу к нему. Держи телефон при себе!")
 
             else:
                 await tg_bot.send_message(id, "Перед тобой в очереди 1 человек. Подожди немного, сейчас "
@@ -185,8 +185,10 @@ if __name__ == "__main__":
             state = list_user[id].state
 
             await tg_bot.send_video_note(id, videos.dops["goodbye"])
-            await tg_bot.send_message(id, "Ты успешно прошёл все комнаты! Покажи это сообщение администратору и получи "
+            await tg_bot.send_message(id, "Ты успешно прошёл все задания! Покажи это сообщение администратору и получи "
                                           "свой подарок!")
+
+            await tg_bot.send_message(id, "Всего пройдено заданий: {} / 10.".format(user.get_count_wins()))
 
             await state.set_state(States.GOODBYE[0])
 
@@ -217,6 +219,8 @@ if __name__ == "__main__":
                                   "Сейчас я отправлю тебя на следующее задание.",
                                   reply_markup=Buttons['k_run'])
         await tg_bot.send_message(user.chatId, "Готов?", reply_markup=Buttons['b_run'])
+
+        print(f"Пользователь {user.username} прошёл квест {quest.name}. Список свободных квестов: {list_quest}")
 
 
     async def welcome_to_the_Quest(user, id_quest):
@@ -408,13 +412,24 @@ if __name__ == "__main__":
         user = list_user[user_id]
         quest_id = user.get_cur_quest().id
 
-        answer = quests_answers[quest_id]
-        await tg_bot.send_message(user_id,
-                                  f"Не печалься! В следующий раз обязательно получится 😉. Правильный ответ: {answer}")
+        if user.get_counter_help() >= counter_help:
 
-        await quit_from_quest(user)
+            # Убавляем счётчик личных побед пользователя.
+            user.reduce_win()
 
-        return True
+            if await user.state.get_state() == States_Quest.QUEST_1[0]:
+                answer = user.morze
+
+            else:
+                answer = quests_answers[quest_id]
+
+            await tg_bot.send_message(user_id,
+                                      f"Не печалься! В следующий раз обязательно получится 😉 \nПравильный ответ: {answer}")
+
+            await quit_from_quest(user=user)
+
+            return True
+
 
 
     @dispatcher.message_handler(state=States_Quest.all(), commands=['quit'])
@@ -469,6 +484,8 @@ if __name__ == "__main__":
         for char in name.lower():
             coded += code_Morze[char]
 
+        user.morze = coded
+
         my_str = msg.text
         my_str = my_str.replace('…', '...')
         my_str = my_str.replace('—', '--')
@@ -495,6 +512,17 @@ if __name__ == "__main__":
 
             await msg.answer(text=f"Нет, что-то здесь не так. Попробуй еще раз. Звездочками обозначены "
                                   f"места с ошибками.\n {t}")
+
+
+            # Проверяем, нужна ли ему помощь пропустить квест.
+            if user.get_counter_help() >= counter_help:
+
+                await tg_bot.send_message(id, "Задание слишком сложное? Нажми кнопку \"Пропустить\".",
+                                          reply_markup=Buttons["skip_quest"])
+
+            else:
+                user.up_counter_help()
+
 
         else:
             videos_true = videos.dops["answer_true"]
@@ -592,7 +620,7 @@ if __name__ == "__main__":
                     return
 
             if len(filter_name) <= 1:
-                await msg.reply("Я понимаю только буквы кириллицы.")
+                await msg.reply("В твоём имени должно быть не менее 2х букв кириллицы. Попробуй ещё раз.")
                 list_user[id].name = None
 
                 return

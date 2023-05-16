@@ -1,5 +1,5 @@
 
-count_quest = 10
+count_quest = 3
 count_hints = 2
 
 
@@ -10,10 +10,14 @@ class User:
         self.name = name  # имя человека при регистрации.
         self.state = state  # состояние dispatcher`а.
 
+        self.morze = None
+
         self.__required_quests = list(range(count_quest))  # список квестов для прохождения
         self.__current_quest = None
         self.__counter_of_attemps = 0
         self.__counter_of_help = 0
+
+        self.__counter_wins = count_quest
 
 
     def get_counter_attemps(self):
@@ -47,6 +51,12 @@ class User:
     def get_cur_quest(self):
         return self.__current_quest
 
+
+    def reduce_win(self):
+        self.__counter_wins -= 1
+
+    def get_count_wins(self):
+        return self.__counter_wins
 
     def is_free(self):
         """
