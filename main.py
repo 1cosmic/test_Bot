@@ -107,6 +107,11 @@ if __name__ == "__main__":
                     # Устанавливаем состояние пользователя на прохождение соответствующего квеста.
                     await user.state.set_state(States_Quest.all()[id])
 
+                    # DEBUG 1:
+                    print(f"Пользователь {user.username} удалён из очереди ожидающих: {await_user}")
+
+                    return
+
         if quest == None:
 
             # print("Пытаюсь обработать пользователя.")
@@ -157,9 +162,17 @@ if __name__ == "__main__":
         """
 
         user = list_user[id]
+        state = list_user[id].state
+
+        print(f"Пользователь {user.name} пытается перейти на следующий квест. Ему осталось {len(user.required_quests())} квест/ов.")
 
         if user.is_free():
+
+            print(f"Пользователю {user.name} ещё необходимо пройти задания.")
+
             if id not in await_user:
+
+                print(f"Пользователь {user.name} не в списке ожидающих.")
 
                 # await tg_bot.send_message(id, "Сейчас проверим, свободны ли квесты?")
                 await sleep(1.5)
@@ -167,8 +180,11 @@ if __name__ == "__main__":
                 if len(free_quests(list_quest)) > 0:
                     # await tg_bot.send_message(id, "По идее, сейчас я тебя перенаправлю на другой квест. Ожидай.",
                     # reply_markup=types.ReplyKeyboardRemove())
+                    print(f"Перенаправляю пользователя {user.name} на следующий квест.")
 
                     await go_to_next_quest(user=user)
+
+                    return
 
                 else:
                     if id not in await_user:
@@ -181,8 +197,10 @@ if __name__ == "__main__":
                 await tg_bot.send_message(id, "Перед тобой в очереди 1 человек. Подожди немного, сейчас "
                                               "он закончит и мы продолжим.")
 
+
+            print(f"Пользователь {user.name} В списке ожидающих.")
+
         else:
-            state = list_user[id].state
 
             await tg_bot.send_video_note(id, videos.dops["goodbye"])
             await tg_bot.send_message(id, "Ты успешно прошёл все задания! Покажи это сообщение администратору и получи "
@@ -191,6 +209,10 @@ if __name__ == "__main__":
             await tg_bot.send_message(id, "Всего пройдено заданий: {} / 10.".format(user.get_count_wins()))
 
             await state.set_state(States.GOODBYE[0])
+
+            return
+
+        await state.set_state(States.GO_TO_NEXT[0])
 
 
     async def quit_from_quest(user):
@@ -220,7 +242,8 @@ if __name__ == "__main__":
                                   reply_markup=Buttons['k_run'])
         await tg_bot.send_message(user.chatId, "Готов?", reply_markup=Buttons['b_run'])
 
-        print(f"Пользователь {user.username} прошёл квест {quest.name}. Список свободных квестов: {list_quest}")
+        name_quests = [i.name for i in list_quest]
+        print(f"Пользователь {user.username} прошёл квест {quest.name}. Список свободных квестов: {name_quests}")
 
 
     async def welcome_to_the_Quest(user, id_quest):
@@ -231,7 +254,7 @@ if __name__ == "__main__":
         for video in videos.question[id_quest]:
             # print(video)
             await tg_bot.send_video_note(user.chatId, video)
-            await sleep(8)
+            await sleep(4)
 
         await tg_bot.send_message(user.chatId, quests_welcomes[id_quest].format(user.name),
                                   reply_markup=types.ReplyKeyboardRemove())

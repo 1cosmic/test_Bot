@@ -1,5 +1,5 @@
 
-count_quest = 3
+count_quest = 1
 count_hints = 2
 
 
