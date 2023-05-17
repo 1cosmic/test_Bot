@@ -1,7 +1,5 @@
-
-count_quest = 1
+count_quest = 10
 count_hints = 2
-
 
 class User:
     def __init__(self, chatId, username, name, state):

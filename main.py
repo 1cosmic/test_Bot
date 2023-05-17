@@ -69,22 +69,24 @@ if __name__ == "__main__":
         await sleep(1)
         await tg_bot.send_message(id, welcome_start['reg_ask_name'])
 
-        await state.set_state(States.REGISTER[0])
+        await list_user[id].state.set_state(States.REGISTER[0])
 
 
     # Создаём список квестов для прохождения.
     list_quest = create_quests()
 
 
-    async def go_to_next_quest(user=None, quest=None):
+    async def go_to_next_quest(user_f=None, quest=None):
 
-        if user == None:
+        if user_f == None:
 
             for u in await_user:
                 user = list_user[u]
                 id = quest.id
 
                 if id in user.required_quests():
+                    await user.state.set_state(States.AWAIT[0])
+
                     await tg_bot.send_message(user.chatId, "Перенаправляю на следующее задание...",
                                               reply_markup=types.ReplyKeyboardRemove())
 
@@ -101,14 +103,13 @@ if __name__ == "__main__":
                     # DEBUG:
                     # await tg_bot.send_message(user.chatId, f"Твоё текущее состояние: {await user.state.get_state()}")
 
-                    await user.state.set_state(States.AWAIT[0])
                     await welcome_to_the_Quest(user, quest.id)
 
                     # Устанавливаем состояние пользователя на прохождение соответствующего квеста.
                     await user.state.set_state(States_Quest.all()[id])
 
                     # DEBUG 1:
-                    print(f"Пользователь {user.username} удалён из очереди ожидающих: {await_user}")
+                    # print(f"Пользователь {user.username} удалён из очереди ожидающих: {await_user}")
 
                     return
 
@@ -123,25 +124,27 @@ if __name__ == "__main__":
 
             for q in quests:
 
-                if q.id in user.required_quests():
+                if q.id in user_f.required_quests():
                     # print("Сейчас пользователь будет перенаправлен.")
 
                     # Связываем пользователя и его квест.
                     # quest_id = list_quest.index(q)
-                    list_quest[q.id].occupy(user)
-                    user.set_cur_quest(q)
+                    list_quest[q.id].occupy(user_f)
+                    user_f.set_cur_quest(q)
 
                     # await tg_bot.send_message(user.chatId, f"Перенаправляю на следующее задание: {q.name}",
                     #                           reply_markup=types.ReplyKeyboardRemove())
 
                     # Устанавливаем состояние пользователя на прохождение соответствующего квеста.
-                    await user.state.set_state(States.AWAIT[0])
+                    await user_f.state.set_state(States.AWAIT[0])
 
-                    await welcome_to_the_Quest(user, q.id)
+                    await welcome_to_the_Quest(user_f, q.id)
 
-                    state = user.state
+                    # state = user_f.state
                     # print(q.id)
-                    await state.set_state(States_Quest.all()[q.id])
+                    await user_f.state.set_state(States_Quest.all()[q.id])
+
+                    # print(f"Перенаправляю пользователя {user_f.name} на следующий квест: {q.name}")
 
                     # Уведомляем пользователя об переходе на следующий квест.
 
@@ -164,31 +167,31 @@ if __name__ == "__main__":
         user = list_user[id]
         state = list_user[id].state
 
-        print(f"Пользователь {user.name} пытается перейти на следующий квест. Ему осталось {len(user.required_quests())} квест/ов.")
+        await state.set_state(States.AWAIT[0])
+
+        # print(f"Пользователь {user.name} пытается перейти на следующий квест. Ему осталось {len(user.required_quests())} квест/ов.")
 
         if user.is_free():
 
-            print(f"Пользователю {user.name} ещё необходимо пройти задания.")
+            # print(f"Пользователю {user.name} ещё необходимо пройти задания.")
 
             if id not in await_user:
 
-                print(f"Пользователь {user.name} не в списке ожидающих.")
+                # print(f"Пользователь {user.name} не в списке ожидающих.")
 
                 # await tg_bot.send_message(id, "Сейчас проверим, свободны ли квесты?")
-                await sleep(1.5)
+                # await sleep(1.5)
 
                 if len(free_quests(list_quest)) > 0:
                     # await tg_bot.send_message(id, "По идее, сейчас я тебя перенаправлю на другой квест. Ожидай.",
                     # reply_markup=types.ReplyKeyboardRemove())
-                    print(f"Перенаправляю пользователя {user.name} на следующий квест.")
 
-                    await go_to_next_quest(user=user)
+                    await go_to_next_quest(user_f=user)
 
                     return
 
                 else:
-                    if id not in await_user:
-                        await_user.append(id)
+                    await_user.append(id)
 
                     await tg_bot.send_message(id,
                                               "Погоди немного, сейчас освободится задание и я тебя проведу к нему. Держи телефон при себе!")
@@ -197,8 +200,7 @@ if __name__ == "__main__":
                 await tg_bot.send_message(id, "Перед тобой в очереди 1 человек. Подожди немного, сейчас "
                                               "он закончит и мы продолжим.")
 
-
-            print(f"Пользователь {user.name} В списке ожидающих.")
+                # print(f"Пользователь {user.name} В списке ожидающих.")
 
         else:
 
@@ -243,7 +245,10 @@ if __name__ == "__main__":
         await tg_bot.send_message(user.chatId, "Готов?", reply_markup=Buttons['b_run'])
 
         name_quests = [i.name for i in list_quest]
-        print(f"Пользователь {user.username} прошёл квест {quest.name}. Список свободных квестов: {name_quests}")
+        # print(f"Пользователь {user.username} прошёл квест {quest.name}. Список свободных квестов: {name_quests}")
+
+
+        # print("IN QUIT: ", user.name, await user.state.get_state())
 
 
     async def welcome_to_the_Quest(user, id_quest):
@@ -282,7 +287,9 @@ if __name__ == "__main__":
 
             await msg.answer(quests_dops["True"])
             await sleep(1)
-            #
+
+            # print("STATE IN QUEST PROCESSOR: ", user.name, await user.state.get_state())
+
             return True
 
         else:
@@ -338,11 +345,6 @@ if __name__ == "__main__":
     # =-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-=
     # =-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-=
 
-    @dispatcher.message_handler(state=States.GOODBYE)
-    async def goodbye(msg: types.Message):
-        await msg.reply("Ты успешно прошёл все испытания! Скорее подходи к администратору музея, мы ждём тебя ;)")
-
-
     @dispatcher.message_handler(state='*', commands=['start'])
     async def start(message: types.Message):
 
@@ -393,9 +395,18 @@ if __name__ == "__main__":
             pre_register_user.remove(id)
 
 
+    @dispatcher.message_handler(state=States.GOODBYE)
+    async def goodbye(msg: types.Message):
+        await msg.reply("Ты успешно прошёл все испытания! Скорее подходи к администратору музея, мы ждём тебя ;)")
+
+
     @dispatcher.message_handler(state=States.AWAIT)
     async def wait(msg: types.Message):
-        pass
+
+        await msg.reply("Ожидай.")
+
+        user = list_user[msg.from_user.id]
+        # print(f"{user.name}: {user.required_quests()}")
 
 
     @dispatcher.callback_query_handler(lambda c: c.data == "!reg")
@@ -420,7 +431,6 @@ if __name__ == "__main__":
         await msg.answer("Смотрю, свободен ли путь...")
 
         user = msg.from_user.id
-        await list_user[user].state.set_state(States.AWAIT[0])
 
         await check_of_free_quests(user)
 
@@ -450,6 +460,8 @@ if __name__ == "__main__":
                                       f"Не печалься! В следующий раз обязательно получится 😉 \nПравильный ответ: {answer}")
 
             await quit_from_quest(user=user)
+
+            # print("STATE IN QUIT MOTHER FUNC: ", user.name, await user.state.get_state())
 
             return True
 
@@ -576,6 +588,8 @@ if __name__ == "__main__":
 
         else:
             await user.state.set_state(States_Quest.all()[quest.id])
+
+        # print("STATE IN QUIZ: ", user.name, await user.state.get_state())
 
 
     @dispatcher.message_handler(state=States_Quest.QUEST_9, content_types=types.ContentType.ANY)
