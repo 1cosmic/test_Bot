@@ -1,3 +1,4 @@
+from copy import copy
 from random import shuffle, randint
 import re
 
@@ -80,7 +81,7 @@ if __name__ == "__main__":
 
         if user_f == None:
 
-            for u in await_user:
+            for u in copy(await_user):
                 user = list_user[u]
                 id = quest.id
 
