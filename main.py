@@ -237,7 +237,6 @@ if __name__ == "__main__":
         await go_to_next_quest(quest=quest)
 
         # await msg.answer(f"Твоё текущее состояние: {await state.get_state()}")
-        await state.set_state(States.GO_TO_NEXT[0])
 
         # Перенаправляем юзера, освободившего квест.
         await tg_bot.send_message(user.chatId,
@@ -246,16 +245,14 @@ if __name__ == "__main__":
         await tg_bot.send_message(user.chatId, "Готов?", reply_markup=Buttons['b_run'])
 
         name_quests = [i.name for i in list_quest]
-        # print(f"Пользователь {user.username} прошёл квест {quest.name}. Список свободных квестов: {name_quests}")
+        print(f"Пользователь {user.username} прошёл квест {quest.name}. Список свободных квестов: {name_quests}")
 
-
-        # print("IN QUIT: ", user.name, await user.state.get_state())
+        await state.set_state(States.GO_TO_NEXT[0])
 
 
     async def welcome_to_the_Quest(user, id_quest):
 
         await sleep(1)
-
 
         for video in videos.question[id_quest]:
             # print(video)
@@ -268,7 +265,6 @@ if __name__ == "__main__":
         if id_quest in range(6, 9):
             await sleep(1)
             await tg_bot.send_message(user.chatId, "Выбери правильный ответ.", reply_markup=Buttons_answers.restruct())
-
 
 
     async def quest_processor(id, msg, id_quest):
@@ -310,7 +306,6 @@ if __name__ == "__main__":
 
             if id_quest in videos.hint.keys():
                 if flag_for_hints < len(videos.hint[id_quest]):
-
                     await tg_bot.send_video_note(id, videos.hint[id_quest][flag_for_hints])
                     await sleep(1.5)
 
@@ -383,10 +378,10 @@ if __name__ == "__main__":
 
         if user_in_quests(list_quest, id):
             user = list_user[id]
-            quest_id = user.get_cur_quest().id
+            quest = user.get_cur_quest()
 
-            list_quest[quest_id].free()
-            await go_to_next_quest(quest_id)
+            list_quest[quest].free()
+            await go_to_next_quest(quest=quest)
 
         if id in list_user.keys():
             await list_user[id].state.reset_state()
@@ -406,7 +401,7 @@ if __name__ == "__main__":
 
         await msg.reply("Ожидай.")
 
-        user = list_user[msg.from_user.id]
+        # user = list_user[msg.from_user.id]
         # print(f"{user.name}: {user.required_quests()}")
 
 
@@ -431,9 +426,10 @@ if __name__ == "__main__":
 
         await msg.answer("Смотрю, свободен ли путь...")
 
-        user = msg.from_user.id
+        id = msg.from_user.id
+        await list_user[id].state.set_state(States.AWAIT[0])
 
-        await check_of_free_quests(user)
+        await check_of_free_quests(id)
 
 
     @dispatcher.callback_query_handler(lambda x: x.data == "!skip_quest", state=States_Quest.all())
@@ -460,16 +456,17 @@ if __name__ == "__main__":
             await tg_bot.send_message(user_id,
                                       f"Не печалься! В следующий раз обязательно получится 😉 \nПравильный ответ: {answer}")
 
-            await quit_from_quest(user=user)
+            print(f"Состояние {user.name} до выхода: {await user.state.get_state()}")
+            await quit_from_quest(user)
+            print(f"Состояние {user.name} после выхода: {await user.state.get_state()}")
 
             # print("STATE IN QUIT MOTHER FUNC: ", user.name, await user.state.get_state())
 
             return True
 
 
-
     @dispatcher.message_handler(state=States_Quest.all(), commands=['quit'])
-    async def quit_from_game(msg: types.Message):
+    async def quit_from_game_command(msg: types.Message):
         """
         Выход из игры.
 
@@ -481,7 +478,10 @@ if __name__ == "__main__":
         id = msg.from_user.id
         user = list_user[id]
 
+        print(f"Пользователь {user.name} принудительно выходит из игры.")
+        print(f"Состояние {user.name} до выхода: {await user.state.get_state()}")
         await quit_from_quest(user)
+        print(f"Состояние {user.name} после выхода: {await user.state.get_state()}")
 
         return True
 
@@ -500,6 +500,7 @@ if __name__ == "__main__":
         await user.state.set_state(States.AWAIT[0])
 
         await check_of_free_quests(id)
+
 
     ##
     ####
@@ -549,7 +550,6 @@ if __name__ == "__main__":
             await msg.answer(text=f"Нет, что-то здесь не так. Попробуй еще раз. Звездочками обозначены "
                                   f"места с ошибками.\n {t}")
 
-
             # Проверяем, нужна ли ему помощь пропустить квест.
             if user.get_counter_help() >= counter_help:
 
@@ -567,7 +567,10 @@ if __name__ == "__main__":
             await sleep(1.5)
 
             await msg.answer(text="Молодец! Все верно!\nКвест пройден!")
-            await quit_from_quest(user=user)
+
+            print(f"Состояние {user.name} до выхода: {await user.state.get_state()}")
+            await quit_from_quest(user)
+            print(f"Состояние {user.name} после выхода: {await user.state.get_state()}")
 
             return
 
@@ -585,7 +588,11 @@ if __name__ == "__main__":
 
         if await quest_processor(id, msg, quest.id):
             # await msg.reply(quests_dops["True"])
+            print(f"Состояние {user.name} до выхода: {await user.state.get_state()}")
             await quit_from_quest(user)
+            print(f"Состояние {user.name} после выхода: {await user.state.get_state()}")
+
+            # return
 
         else:
             await user.state.set_state(States_Quest.all()[quest.id])
@@ -608,7 +615,6 @@ if __name__ == "__main__":
 
         # else:
         await msg.reply("Я хочу увидеть фотографию твоего рисунка.")
-
 
 
     @dispatcher.message_handler(state=States.REGISTER)
@@ -637,8 +643,10 @@ if __name__ == "__main__":
             await msg.answer(reg_start['start?'],
                              reply_markup=Buttons["b_run"])
 
+            print(f"Зарегистрирован пользователь: {list_user[id].name}")
 
             await state.set_state(States.GO_TO_NEXT[0])  # распределение по алгоритму.
+            return
 
             # Включить после написания готовой логики распределения по квестам.
             # await state.set_state(States.AWAIT_QUEST[0])  # распределение по кнопке.

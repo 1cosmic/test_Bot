@@ -1,4 +1,4 @@
-count_quest = 10
+count_quest = 2
 count_hints = 2
 
 class User:
