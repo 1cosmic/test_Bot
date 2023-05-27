@@ -89,6 +89,15 @@ class Answers_buttons():
 
 
 
-answ = [1, 2, 3, 4]
+answ = ["1", "2", "3", "4"]
 
-Buttons_answers = Answers_buttons(answ)
+Buttons_answers = {
+    1: Answers_buttons(["3", "2", "5", "8"]),
+    2: Answers_buttons(["1675", "18823", "2341", "1759"]),
+    3: Answers_buttons(["Тигр", "Медведь", "Обезьяна", "Лиса"]),
+    4: Answers_buttons(["Лестница", "Самолет", " Цветок", "Бабочка"]),
+    5: Answers_buttons(["Траграм", "Танграм", "Тарам-тарам", "Тортграм"]),
+    6: Answers_buttons(answ),
+    7: Answers_buttons(answ),
+    8: Answers_buttons(answ),
+}
