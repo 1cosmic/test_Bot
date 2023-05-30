@@ -2,7 +2,7 @@
 from time import time
 
 # count_quest = 2
-count_hints = 2
+# count_hints = 10
 
 
 
@@ -20,6 +20,8 @@ class User:
         self.__current_quest = None
         self.__counter_of_attemps = 0
         self.__counter_of_help = 0
+
+        self.__await = False
 
         self.__counter_wins = count_quest
 
@@ -110,3 +112,12 @@ class User:
 
     def get_last_time_active(self):
         return self.__last_time_active
+
+
+    def setAwait(self, await_boolean):
+        """Set await status."""
+        self.__await = await_boolean
+
+    def getAwait(self):
+        """Return current await status."""
+        return self.__await

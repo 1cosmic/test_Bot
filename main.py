@@ -3,6 +3,7 @@ from copy import copy
 from random import shuffle, randint
 import re
 from time import time
+import datetime
 
 from project import config
 
@@ -26,11 +27,12 @@ from asyncio import sleep
 filter_char_name = "абвгдеёжзийклмнопрстуфхцчшщъыьэюя"
 
 counter_help = 3
-count_user_in_quest = 2
+count_user_in_quest = 1
+timeout = 3600
 
 time_await = {
     "text": 1,
-    "video": 1,
+    "video": 5,
 }
 
 # =-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-=
@@ -65,6 +67,11 @@ await_user = []
 # Создаём список квестов для прохождения.
 list_quest = create_quests()
 
+# Notify admin:
+finished_quest = []
+id_admin = 867140367
+date_notify = datetime.date.today()
+
 
 def cleaner():
     """
@@ -92,11 +99,6 @@ async def register(msg):
     await tg_bot.send_message(id_, welcome_start["reg"])
     await sleep(time_await["text"])
     await tg_bot.send_message(id_, welcome_start['reg_ask_name'])
-
-
-    # >>>>
-    # >>>>
-
 
     await state.set_state(States.REGISTER[0])
 
@@ -189,7 +191,7 @@ async def quest_dispatcher(msg):
     user_quest = user.get_cur_quest()
     if user_quest != None:
 
-        return True
+        return False
 
     # Фильтруем и сортируем квесты.
     quests = sorted(list_quest, key=lambda x: x.getCountUser())
@@ -218,16 +220,18 @@ def quest_quit(user):
     # state = user.state
 
     quest = user.get_cur_quest()
-    quest.removeUser(user)
 
-    user.pop_quest(quest.id_)
-    user.set_cur_quest(None)
-    user.reset_counter_attemps()
-    user.reset_counter_help()
+    if quest != None:
+        quest.removeUser(user)
 
-    print(f"Пользователь {user.name} вышел из {quest.name}")
+        user.pop_quest(quest.id_)
+        user.set_cur_quest(None)
+        user.reset_counter_attemps()
+        user.reset_counter_help()
 
-    return quest
+        print(f"Пользователь {user.name} вышел из {quest.name}")
+
+        return quest
 
 
 def await_user_dispatcher(quest):
@@ -278,28 +282,40 @@ async def start(message: types.Message):
 
 
 
-# @dispatcher.message_handler(state="*", commands=["restart"])
-# async def restart_game_for_user(msg: types.Message):
-#     """
-#     Сбрасывает все состояния пользовател, переводя его в режим регистрации.
-#     :param msg:
-#     :return:
-#     """
-#
-#     id = msg.from_user.id
-#
-#     if user_in_quests(list_quest, id):
-#         user = list_user[id]
-#         quest = user.get_cur_quest()
-#
-#         list_quest[quest].free()
-#
-#     if id in list_user.keys():
-#         await list_user[id].state.reset_state()
-#         list_user.pop(id)
-#
-#     if id in pre_register_user:
-#         pre_register_user.remove(id)
+@dispatcher.message_handler(state="*", commands=["restart"])
+async def restart_game(msg: types.Message):
+    """
+    Сбрасывает все состояния пользовател, переводя его в режим регистрации.
+    :param msg:
+    :return:
+    """
+
+    id_ = msg.from_user.id
+
+    if id_ in list_user.keys():
+        user = list_user[id_]
+
+        if user.get_cur_quest() != None:
+
+            vacated_quest = quest_quit(user)
+            vacated_user = await_user_dispatcher(vacated_quest)
+
+            if vacated_user != False and vacated_quest != None:
+                await tg_bot.send_message(vacated_user.id_, quests_dops["await_go"], reply_markup=Buttons["k_run"])
+
+            # await user.state.set_state(States.GO_TO_NEXT[0])
+            #
+            # await msg.answer(reg_start['start?'], reply_markup=Buttons["b_run"])
+
+    if id_ in pre_register_user:
+        pre_register_user.remove(id_)
+
+    if id_ in await_user:
+        await_user.remove(id_)
+
+    if id_ in list_user.keys():
+        await list_user[id_].state.reset_state()
+        list_user.pop(id_)
 
 
 @dispatcher.message_handler(state=States.GOODBYE)
@@ -341,7 +357,7 @@ async def skip_game(msg: types.Message):
             answer = quests_answers[quest.id_]
 
         await tg_bot.send_message(user_id,
-                                  f"Не печалься! В следующий раз обязательно получится 😉 \nПравильный ответ: {answer}")
+                                  f"Не печалься! В следующий раз обязательно получится 😉 \nПравильный ответ: {answer[0]}")
 
 
         # Блок кода - выход. Пользователь выходит из квеста, который затем отправляется по очереди.
@@ -354,7 +370,7 @@ async def skip_game(msg: types.Message):
 
         await user.state.set_state(States.GO_TO_NEXT[0])
 
-        await msg.answer(reg_start['start?'], reply_markup=Buttons["b_run"])
+        await tg_bot.send_message(user_id, reg_start['start?'], reply_markup=Buttons["b_run"])
         return
         ###
 
@@ -370,13 +386,13 @@ async def quit_from_game_command(msg: types.Message):
     :return:
     """
 
-    await msg.answer("Выходим из квеста.")
+    await msg.answer("Выходим из задания.")
 
     id = msg.from_user.id
     user = list_user[id]
     await user.state.set_state(States.AWAIT[0])
 
-    print(f"Пользователь {user.name} принудительно выходит из игры.")
+    # print(f"Пользователь {user.name} принудительно выходит из игры.")
 
     # Блок кода - выход. Пользователь выходит из квеста, который затем отправляется по очереди.
     vacated_quest = quest_quit(user)
@@ -425,6 +441,11 @@ async def processed_go_to_next(msg: types.Message):
             await state.set_state(States.GO_TO_NEXT[0])
 
     else:
+
+        # Сохраняем всех, кто прошёл задания до конца.
+        if user not in finished_quest:
+            finished_quest.append(user)
+
         await tg_bot.send_video_note(id_, videos.dops["goodbye"])
         await msg.answer(quests_dops["win"].format(user.get_count_wins()))
         await state.set_state(States.GOODBYE[0])
@@ -456,6 +477,10 @@ async def processed_message(callback: types.CallbackQuery):
             await state.set_state(States.GO_TO_NEXT[0])
 
     else:
+
+        # Сохраняем всех, кто прошёл задания до конца.
+        if user not in finished_quest:
+            finished_quest.append(user)
 
         await tg_bot.send_video_note(id_, videos.dops["goodbye"])
 
@@ -597,8 +622,11 @@ async def q_Photo(msg: types.Message):
             await tg_bot.send_message(vacated_user.id_, quests_dops["await_go"], reply_markup=Buttons["k_run"])
 
         await user.state.set_state(States.GO_TO_NEXT[0])
+
+        await msg.answer(reg_start['start?'], reply_markup=Buttons["b_run"])
         return
         ###
+
 
     await msg.reply("Я хочу увидеть фотографию твоего рисунка.")
     await state.set_state(States_Quest.QUEST_9[0])
@@ -627,7 +655,7 @@ async def register_user(msg: types.Message):
 
     id = msg.from_user.id
 
-    print(list_user)
+    # print(list_user)
 
     state = list_user[id].state
     await state.set_state(States.AWAIT[0])
@@ -745,20 +773,52 @@ async def infinity_loop():
         for u in users_await:
             # print("Ожидает удаления: ", u)
 
-            if list_user[u].get_last_time_active() < curtime - 3600:
+            user = list_user[u]
+            last_time_active = user.get_last_time_active()
+            user_quest = user.get_cur_quest()
+            state = user.state
 
-                state = dispatcher.current_state(user=u)
+            if last_time_active < curtime - timeout and user_quest == None:
+
+                await state.set_state(States.AWAIT[0])
+
+                # Блок кода - выход. Пользователь выходит из квеста, который затем отправляется по очереди.
+                vacated_quest = quest_quit(user)
+                vacated_user = await_user_dispatcher(vacated_quest)
+
+                if vacated_user != False and vacated_quest != None:
+                    await tg_bot.send_message(vacated_user.id_, quests_dops["await_go"], reply_markup=Buttons["k_run"])
+
                 await state.reset_state()
-
                 list_user.pop(u)
                 print("Удалён пользователь: ", u)
 
 
-    pass
+async def logging():
+
+    while True:
+
+        await sleep(60)
+        # Уведомление администратору об прохождении квестов.
+
+        curTimeDay = datetime.datetime.today()
+        if datetime.time(18) < curTimeDay.time() < datetime.time(18, 2):
+
+            log_message = f"""Отчёт на {curTimeDay}. Прошло заданий: {len(finished_quest)} человек."""
+            log_message += "\n\n"
+
+            for u in finished_quest:
+                log_message += f"{u.name}, {u.username}, попыток: {u.get_count_wins()}\n"
+
+            await tg_bot.send_message(id_admin, log_message)
+            finished_quest.clear()
 
 
 if __name__ == "__main__":
+
     loop = asyncio.get_event_loop()
     loop.create_task(infinity_loop())
+    loop.create_task(logging())
     asyncio.set_event_loop(loop)
+
     executor.start_polling(dispatcher)
