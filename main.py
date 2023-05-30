@@ -27,7 +27,7 @@ from asyncio import sleep
 filter_char_name = "абвгдеёжзийклмнопрстуфхцчшщъыьэюя"
 
 counter_help = 3
-count_user_in_quest = 1
+count_user_in_quest = 3
 timeout = 3600
 
 time_await = {
