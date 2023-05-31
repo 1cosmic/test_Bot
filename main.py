@@ -33,6 +33,7 @@ timeout = 3600
 time_await = {
     "text": 1,
     "video": 5,
+    "video_quest": 3,
 }
 
 # =-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-==-=
@@ -131,7 +132,7 @@ async def quest_processor(msg, id_quest):
         random_video = randint(0, len(videos_true) - 1)
 
         await tg_bot.send_video_note(id_, videos_true[random_video])
-        await sleep(time_await["video"])
+        await sleep(time_await["video_quest"])
 
         await msg.answer(quests_dops["True"], reply_markup=types.ReplyKeyboardRemove())
         await sleep(time_await["text"])
@@ -149,7 +150,7 @@ async def quest_processor(msg, id_quest):
         random_video = randint(0, len(videos_false) - 1)
 
         await tg_bot.send_video_note(id_, videos_false[random_video])
-        await sleep(time_await["video"])
+        await sleep(time_await["video_quest"])
 
         await msg.answer(quests_dops["False"])
         await sleep(time_await["text"])
@@ -158,7 +159,7 @@ async def quest_processor(msg, id_quest):
             if flag_for_hints < len(videos.hint[id_quest]):
 
                 await tg_bot.send_video_note(id_, videos.hint[id_quest][flag_for_hints])
-                await sleep(time_await["video"])
+                await sleep(time_await["video_quest"])
 
         if id_quest in quests_hints.keys():
 
